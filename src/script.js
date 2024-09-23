@@ -1,5 +1,6 @@
 // Variables globales
 let playlist = [];
+let currentSongIndex = 0; // Índice para la canción actual
 let player = document.getElementById('player');
 let dur = document.getElementById('dur'); // Control deslizante de la barra de progreso
 let mDur = 0; // Variable para la duración total de la pista
@@ -8,23 +9,36 @@ let mDur = 0; // Variable para la duración total de la pista
 async function loadPlaylist() {
   try {
     const response = await fetch('src/data/data.json');
-    if (!response.ok) throw new Error('Network response was not ok.');
+    if (!response.ok) throw new Error('Error al cargar la lista.');
     const data = await response.json();
-    playlist = data; // Almacena los datos en la variable global
-    playRandomSong(); // Inicia la reproducción con una canción aleatoria
-    initPlayers(1); // Inicializa los reproductores
+    playlist = data;
+    if (playlist.length > 0) {
+      playSong(currentSongIndex); // Reproducir la primera canción
+    }
   } catch (error) {
-    console.error('Error al cargar la lista de canciones:', error);
+    console.error('Error:', error);
   }
 }
 
-// Función para reproducir una canción aleatoria
-function playRandomSong() {
+// Función para reproducir una canción según el índice
+function playSong(index) {
   if (playlist.length === 0) return; // Verifica si hay canciones en la lista
-  let randomIndex = Math.floor(Math.random() * playlist.length);
-  player.src = playlist[randomIndex].audio;
-  $('.title').html(playlist[randomIndex].title);
+  currentSongIndex = index; // Actualiza el índice actual
+  player.src = playlist[currentSongIndex].audio;
+  $('.title').html(playlist[currentSongIndex].title);
   player.play();
+}
+
+// Función para avanzar a la siguiente canción
+function nextSong() {
+  currentSongIndex = (currentSongIndex + 1) % playlist.length; // Avanzar con ciclo
+  playSong(currentSongIndex);
+}
+
+// Función para retroceder a la canción anterior
+function prevSong() {
+  currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length; // Retroceder con ciclo
+  playSong(currentSongIndex);
 }
 
 // Función para calcular el tiempo total en formato minutos:segundos
@@ -51,13 +65,12 @@ function initProgressBar() {
     let currentDisplay = calculateCurrentValue(currentTime);
     jQuery(".start-time").html(currentDisplay);
     dur.value = currentTime;
-    dur.max = length; // Asegúrate de establecer el valor máximo del control deslizante
+    dur.max = length;
 
-    // Si la pista ha terminado, reproduce una nueva canción
     if (currentTime >= length) {
       $("#play-btn").removeClass("fa-pause").addClass("fa-play");
       dur.value = 0;
-      playRandomSong(); // Reproduce otra canción al finalizar la actual
+      nextSong(); // Avanzar a la siguiente canción al finalizar
     }
   }
 }
@@ -66,7 +79,7 @@ function initProgressBar() {
 function updateDuration() {
   if (player.duration) {
     mDur = player.duration;
-    dur.max = mDur; // Actualiza el valor máximo del control deslizante
+    dur.max = mDur;
   }
 }
 
@@ -75,44 +88,27 @@ function setCurrentTime() {
   player.currentTime = dur.value;
 }
 
-// Función para inicializar los reproductores
-function initPlayers(num) {
-  for (let i = 0; i < num; i++) {
-    (function () {
-      let playBtn = document.getElementById('play-btn');
+// Inicializa el botón de reproducción
+function initPlayers() {
+  let playBtn = document.getElementById('play-btn');
+  if (playBtn) {
+    playBtn.addEventListener('click', togglePlay);
+  }
 
-      if (playBtn != null) {
-        playBtn.addEventListener('click', function () {
-          togglePlay();
-        });
-      }
-
-      function togglePlay() {
-        if (!player.paused) {
-          player.pause();
-          $("#play-btn").removeClass("fa-pause").addClass("fa-play");
-        } else {
-          player.play();
-          $("#play-btn").removeClass("fa-play").addClass("fa-pause");
-        }
-      }
-    }());
+  function togglePlay() {
+    if (player.paused) {
+      player.play();
+      $("#play-btn").removeClass("fa-play").addClass("fa-pause");
+    } else {
+      player.pause();
+      $("#play-btn").removeClass("fa-pause").addClass("fa-play");
+    }
   }
 }
 
-// Cambiar de canción
-$("#next").data('dir', 1);
-$("#prev").data('dir', -1);
-
-$('#next, #prev').on('click', function () {
-  let direction = $(this).data('dir');
-  let currentIndex = playlist.findIndex(song => song.audio === player.src);
-  let newIndex = (currentIndex + direction + playlist.length) % playlist.length;
-  player.src = playlist[newIndex].audio;
-  $('.title').html(playlist[newIndex].title);
-  $('#play-btn').removeClass("fa-play").addClass("fa-pause");
-  player.play();
-});
+// Control de los botones de siguiente y anterior
+$("#next").on('click', nextSong);
+$("#prev").on('click', prevSong);
 
 // Control del volumen
 $(".audio-player").toArray().forEach(function (player) {
@@ -128,18 +124,7 @@ $(".audio-player").toArray().forEach(function (player) {
   });
 });
 
-// Control del dropdown
-$('.dropdown-toggle').click(function () {
-  $(this).next('.dropdown').slideToggle("fast");
-});
-$(document).click(function (e) {
-  var target = e.target;
-  if (!$(target).is('.dropdown-toggle') && !$(target).parents().is('.dropdown-toggle')) {
-    $('.dropdown').hide();
-  }
-});
-
-// Cambio de temas
+// Función para cambiar el tema de la interfaz
 $('#darkButton').click(switchDark);
 $('#whiteButton').click(switchWhite);
 $('#blueButton').click(switchBlue);
@@ -173,6 +158,17 @@ function switchBlue() {
   $('.audio-player #play-btn').css({'color': '#fff', 'border-color': '#fff'});
   $('.ctrl_btn').css({'color': '#fff', 'border-color': '#fff'});
 }
+
+// Control del dropdown
+$('.dropdown-toggle').click(function () {
+  $(this).next('.dropdown').slideToggle("fast");
+});
+$(document).click(function (e) {
+  var target = e.target;
+  if (!$(target).is('.dropdown-toggle') && !$(target).parents().is('.dropdown-toggle')) {
+    $('.dropdown').hide();
+  }
+});
 
 // Inicializar el reproductor y la lista de reproducción
 loadPlaylist(); // Llama a la función para cargar la lista de reproducción
